@@ -21,7 +21,13 @@
     <EnableUnmanagedDebugging>false</EnableUnmanagedDebugging>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="MESRGAN_discriminator.py">
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Include="meta_ESRGAN.py" />
+    <Compile Include="meta_ESRGAN_train.py">
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Include="RRDB.py">
       <SubType>Code</SubType>
     </Compile>
