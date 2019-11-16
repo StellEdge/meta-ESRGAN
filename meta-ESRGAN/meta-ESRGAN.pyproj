@@ -28,7 +28,7 @@
     <Compile Include="meta_ESRGAN_train.py">
       <SubType>Code</SubType>
     </Compile>
-    <Compile Include="RRDB.py">
+    <Compile Include="MESRGAN_generator.py">
       <SubType>Code</SubType>
     </Compile>
   </ItemGroup>
