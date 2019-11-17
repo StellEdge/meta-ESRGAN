@@ -3,9 +3,11 @@ TRain MESRGAN with DIV2K https://data.vision.ee.ethz.ch/cvl/DIV2K/
 '''
 import argparse
 import torch
+import torch.nn as nn
 from psnr import PSNRLoss
 from MESRGAN_generator import *
 from MESRGAN_discriminator import *
+from dataloader import *
 
 
 parser = argparse.ArgumentParser()
@@ -39,5 +41,5 @@ psnr_loss=PSNRLoss()
 G=RRDBNet(3, 3, 64, 23, gc=32)
 D=discriminator_VGG(channel_in=3,channel_gain=64,input_size=128)
 
-work_folder=""
-dataset
+
+train_dataset=get_pic_dataset("/"+opt.dataset_name)

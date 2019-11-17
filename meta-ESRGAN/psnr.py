@@ -8,7 +8,7 @@ def PSNR_Loss(img1, img2):
    PIXEL_MAX = 1
    return 20 * math.log10(PIXEL_MAX / math.sqrt(mse))
 
-class PSNRLoss(nn.module):
+class PSNRLoss(nn.Module):
     def __init__(self):
         super(PSNRLoss,self).__init__()
     def forward(self,x,y):
