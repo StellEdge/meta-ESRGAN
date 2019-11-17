@@ -5,7 +5,9 @@ from psnr import PSNRLoss
 from MESRGAN_generator import *
 from dataloader import *
 from Utils import *
-import matplotlib.pyplot as plt
+
+
+
 train_phase_name='PSNR'
 parser = argparse.ArgumentParser()
 parser.add_argument("--epoch", type=int, default=0, help="epoch to start training from")
@@ -47,7 +49,6 @@ if cuda:
     G = G.cuda()
     loss_psnr=loss_psnr.cuda()
 
-train_dataset=get_pic_dataset("/"+opt.dataset_name)
 
 gen_params = list(G.parameters())
 optimizer_G = torch.optim.Adam([p for p in gen_params if p.requires_grad],lr=opt.lr, betas=(opt.b1, opt.b2))
@@ -64,10 +65,10 @@ else:
     # Initialize weights,here smaller sigma is better for trainning
     G.apply(weights_init)
 
-print(train_dataset.class_to_idx)
-plt.imshow(train_dataset[0][0])
-plt.axis('off')
-plt.show()
+dataloader =get_pic_dataloader("/"+opt.dataset_name,opt.batch_size)
 
 prev_time = time.time()
 #for epoch in range(opt.epoch, opt.n_epochs):
+for i, batch in enumerate(dataloader):
+    print(batch["LR"].size())
+    print(batch["HR"].size())
