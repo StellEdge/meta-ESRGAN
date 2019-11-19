@@ -68,7 +68,50 @@ else:
 dataloader =get_pic_dataloader("/"+opt.dataset_name,opt.batch_size)
 
 prev_time = time.time()
-#for epoch in range(opt.epoch, opt.n_epochs):
-for i, batch in enumerate(dataloader):
-    print(batch["LR"].size())
-    print(batch["HR"].size())
+for epoch in range(opt.epoch, opt.n_epochs):
+    for i, batch in enumerate(dataloader):
+        print(batch["LR"].size())
+        print(batch["HR"].size())
+        if cuda:
+            input=Variable(batch["X"].cuda(),requires_grad=False)
+            ground_truth=Variable(batch["Y"].cuda(),requires_grad=False)
+        else:
+            input=Variable(batch["X"],requires_grad=False)
+            ground_truth=Variable(batch["Y"],requires_grad=False)
+        #train G
+        G.train()
+        optimizer_G.zero_grad()
+        fake=G(input)
+        #loss calculation
+        loss_G=loss_psnr(fake,ground_truth)
+        loss_G.backward()
+        optimizer_G.step()
+
+        # Determine approximate time left
+        batches_done = epoch * len(dataloader) + i
+        batches_left = opt.n_epochs * len(dataloader) - batches_done
+        time_left = datetime.timedelta(seconds=batches_left * (time.time() - prev_time))
+        prev_time = time.time()
+
+        # Print log
+        sys.stdout.write(
+            "\r[Epoch %d/%d] [Batch %d/%d] [G loss: %f] ETA: %s"
+            % (
+                epoch,
+                opt.n_epochs,
+                i,
+                len(dataloader),
+                loss_G.item(),
+                time_left,
+            )
+        )
+        if batches_done % opt.sample_interval == 0:
+            pass
+            #sample_transform(temp_save,str(epoch))
+            #save_sample_images(temp_save,str(epoch)+'_'+str(i))
+    # Update learning rates
+
+    lr_scheduler_G.step()
+    if opt.checkpoint_interval != -1 and epoch % opt.checkpoint_interval == 0 and epoch!=0:
+        # Save model checkpoints
+        torch.save(G.state_dict(), "saved_models/%s/G_"+train_phase_name+"_%d.pth" % (opt.dataset_name, epoch))
