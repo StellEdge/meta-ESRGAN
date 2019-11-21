@@ -15,16 +15,18 @@ class ResidualDenseBlock(nn.Module):
         for i in range(in_block_layer):
             self.conv_layer_list.append(nn.Conv2d(channel_in+i*channel_gain,channel_gain, 3, 1, 1, bias=bias))
         self.conv_layer_list.append(nn.Conv2d(channel_in+in_block_layer*channel_gain,  channel_in, 3, 1, 1, bias=bias))
+        self.conv_layer_list=nn.ModuleList(self.conv_layer_list)
         self.lrelu = nn.LeakyReLU(negative_slope=0.2, inplace=True)
         # initialization
         # mutil.initialize_weights([self.conv1, self.conv2, self.conv3, self.conv4, self.conv5], 0.1)
 
     def forward(self, x):
         x_res=[]
-        for i in in_block_layer:
+        x_res.append(x)
+        for i in range(self.in_block_layer):
             x_res.append( self.lrelu(self.conv_layer_list[i](torch.cat(x_res, 1))))
         x_out = self.conv_layer_list[-1](torch.cat(x_res, 1))
-        return x_out * res_alpha + x
+        return x_out * self.res_alpha + x
 
 class RRDB(nn.Module):
     '''Residual in Residual Dense Block'''
@@ -36,11 +38,12 @@ class RRDB(nn.Module):
         self.res_alpha=res_alpha
         for _ in range(block_num):
             self.blocks.append(ResidualDenseBlock( channel_in, channel_gain))
+        self.blocks=nn.ModuleList(self.blocks)
     def forward(self, x):
         out=x
-        for i in range(block_num):
+        for i in range(self.block_num):
             out=self.blocks[i](out)
-        return out * res_alpha + x
+        return out * self.res_alpha + x
 
 def make_layer(block, n_layers):
     layers = []

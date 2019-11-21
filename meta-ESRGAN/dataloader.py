@@ -4,6 +4,7 @@ from torchvision.datasets import ImageFolder
 from torchvision import transforms
 from work_header import *
 from PIL import Image
+import random
 
 transform=transforms.Compose([
     transforms.ToTensor()
@@ -43,10 +44,26 @@ class LRHR_Dataset(Dataset):
 
         HR_imgs = os.listdir(data_path_HR)
         self.HR_imgs = [os.path.join(data_path_HR, img) for img in HR_imgs]
+    def cut(self,index):
+        img_LR = Image.open(self.LR_imgs[index])
+        img_HR = Image.open(self.HR_imgs[index])
 
+        img_LR_width = img_LR.width - 128
+        img_LR_height = img_LR.height - 128
+        img_HR_width = img_HR.width - 512
+        img_HR_height = img_HR.height - 512
+
+        cut_LR_h = min(random.randint(0, img_LR_height), random.randint(0, img_HR_height) / 4)
+        cut_LR_w = min(random.randint(0, img_LR_width), random.randint(0, img_HR_width) / 4)
+        fixed_img_LR = img_LR.crop((cut_LR_w, cut_LR_h, cut_LR_w + 128, cut_LR_h + 128))
+        fixed_img_HR = img_HR.crop((cut_LR_w * 4, cut_LR_h * 4, cut_LR_w * 4 + 512, cut_LR_h * 4 + 512))
+        return fixed_img_LR.convert('RGB'), fixed_img_HR.convert('RGB')
     def __getitem__(self,index):
-        img_LR=transform(Image.open(self.LR_imgs[index]).convert('RGB'))
-        img_HR=transform(Image.open(self.HR_imgs[index]).convert('RGB'))
+        #img_LR=transform(Image.open(self.LR_imgs[index]).convert('RGB'))
+        #img_HR=transform(Image.open(self.HR_imgs[index]).convert('RGB'))
+        fixed_img_LR,fixed_img_HR=self.cut(index)
+        img_LR=transform(fixed_img_LR)
+        img_HR=transform(fixed_img_HR)
         return {
             'LR': img_LR,
             'HR': img_HR,
@@ -55,4 +72,4 @@ class LRHR_Dataset(Dataset):
         }
     def __len__(self):
         return min(len(self.HR_imgs),len(self.LR_imgs))
-
+    

@@ -5,15 +5,17 @@ from psnr import PSNRLoss
 from MESRGAN_generator import *
 from dataloader import *
 from Utils import *
-
-
+from torch.autograd import Variable
+import datetime
+import time
+import sys
 
 train_phase_name='PSNR'
 parser = argparse.ArgumentParser()
 parser.add_argument("--epoch", type=int, default=0, help="epoch to start training from")
-parser.add_argument("--n_epochs", type=int, default=500, help="number of epochs of training")
+parser.add_argument("--n_epochs", type=int, default=100, help="number of epochs of training")
 parser.add_argument("--dataset_name", type=str, default="div2k", help="name of the dataset")
-parser.add_argument("--batch_size", type=int, default=16, help="size of the batches")
+parser.add_argument("--batch_size", type=int, default=1, help="size of the batches")
 parser.add_argument("--lr", type=float, default=0.0002, help="adam: learning rate")
 parser.add_argument("--b1", type=float, default=0.9, help="adam: decay of first order momentum of gradient")
 parser.add_argument("--b2", type=float, default=0.99, help="adam: decay of first order momentum of gradient")
@@ -22,8 +24,8 @@ parser.add_argument("--n_cpu", type=int, default=8, help="number of cpu threads 
 parser.add_argument("--img_height", type=int, default=256, help="size of image height")
 parser.add_argument("--img_width", type=int, default=256, help="size of image width")
 parser.add_argument("--channels", type=int, default=3, help="number of image channels")
-parser.add_argument("--sample_interval", type=int, default=50, help="interval between saving generator outputs")
-parser.add_argument("--checkpoint_interval", type=int, default=50, help="interval between saving model checkpoints")
+parser.add_argument("--sample_interval", type=int, default=200, help="interval between saving generator outputs")
+parser.add_argument("--checkpoint_interval", type=int, default=10, help="interval between saving model checkpoints")
 parser.add_argument("--n_residual_blocks", type=int, default=9, help="number of residual blocks in generator")
 parser.add_argument("--lambda_cyc", type=float, default=10, help="cycle loss weight")
 parser.add_argument("--lambda_cha", type=float, default=1.0, help="characteristic loss weight")
@@ -40,7 +42,7 @@ Loss loss_G=loss_per+lamda*loss
 '''
 #psnr_loss=PSNRLoss()
 loss_psnr=nn.L1Loss()
-G=RRDBNet(3, 3, 64, 23, gc=32)
+G=RRDBNet(3, 3, 64, 23, gc=32) #origin 23 blocks
 
 
 
@@ -66,18 +68,26 @@ else:
     G.apply(weights_init)
 
 dataloader =get_pic_dataloader("/"+opt.dataset_name,opt.batch_size)
+temp_save=work_folder+"/psnr_temp"
+def save_sample_images(path,label):
+    G.eval()
+    r_transform=transforms.Compose([transforms.ToPILImage()])
+    for i, batch in enumerate(dataloader):
+        lr_img=Variable(batch["LR"].cuda(),requires_grad=False)
+        fake=G(lr_img)
+        img_res=[r_transform(lr_img.data.cpu()[0]),  #origin image
+                 r_transform(fake.data.cpu()[0])    #output image 
+                 ]
+        for k,i in enumerate(img_res):
+            i.save(os.path.join(temp_save,label+'_'+str(k)+'.jpg'),quality=95)
+        break
+
 
 prev_time = time.time()
 for epoch in range(opt.epoch, opt.n_epochs):
     for i, batch in enumerate(dataloader):
-        print(batch["LR"].size())
-        print(batch["HR"].size())
-        if cuda:
-            input=Variable(batch["X"].cuda(),requires_grad=False)
-            ground_truth=Variable(batch["Y"].cuda(),requires_grad=False)
-        else:
-            input=Variable(batch["X"],requires_grad=False)
-            ground_truth=Variable(batch["Y"],requires_grad=False)
+        input=Variable(batch["LR"].cuda(),requires_grad=False)
+        ground_truth=Variable(batch["HR"].cuda(),requires_grad=False)
         #train G
         G.train()
         optimizer_G.zero_grad()
@@ -108,7 +118,7 @@ for epoch in range(opt.epoch, opt.n_epochs):
         if batches_done % opt.sample_interval == 0:
             pass
             #sample_transform(temp_save,str(epoch))
-            #save_sample_images(temp_save,str(epoch)+'_'+str(i))
+            save_sample_images(temp_save,str(epoch)+'_'+str(i))
     # Update learning rates
 
     lr_scheduler_G.step()

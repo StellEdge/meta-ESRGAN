@@ -40,6 +40,9 @@
     <Compile Include="psnr.py">
       <SubType>Code</SubType>
     </Compile>
+    <Compile Include="RRDBNet_arch.py">
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Include="Utils.py">
       <SubType>Code</SubType>
     </Compile>
