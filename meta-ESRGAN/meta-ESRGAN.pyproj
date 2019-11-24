@@ -30,7 +30,6 @@
     <Compile Include="MESRGAN_train_PSNR.py">
       <SubType>Code</SubType>
     </Compile>
-    <Compile Include="meta_ESRGAN.py" />
     <Compile Include="MESRGAN_train_GAN.py">
       <SubType>Code</SubType>
     </Compile>
