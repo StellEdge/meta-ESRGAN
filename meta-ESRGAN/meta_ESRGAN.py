@@ -1,3 +1,0 @@
-'''
-stelledge:main training
-'''

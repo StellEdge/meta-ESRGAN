@@ -36,7 +36,7 @@ class VGGFeatureExtractor(nn.Module):
         return output
 
 
-class discriminator_VGG(nn.module):
+class discriminator_VGG(nn.Module):
     def __init__(self,channel_in,channel_gain,input_size):
         super(discriminator_VGG,self).__init__()
 
@@ -47,13 +47,15 @@ class discriminator_VGG(nn.module):
                       nn.BatchNorm2d(channel_gain,affine=True),
                       nn.LeakyReLU(0.2,True),
                       ]
+        self.in_conv=nn.Sequential(*self.in_conv)
         cur_dim=channel_gain
         cur_size=input_size/2
         self.conv_layers=[]
         for i in range(3):
-            conv_layers+=build_conv_block(cur_dim)
+            self.conv_layers+=self.build_conv_block(cur_dim)
             cur_dim*=2
             cur_size/=2
+        self.conv_layers=nn.Sequential(*self.conv_layers)
         self.out_conv=[
             nn.Conv2d(cur_dim,cur_dim,3,1,1,bias=True),
             nn.BatchNorm2d(cur_dim,affine=True),
@@ -62,13 +64,14 @@ class discriminator_VGG(nn.module):
             nn.BatchNorm2d(cur_dim,affine=True),
             nn.LeakyReLU(0.2,True),
             ]
+        self.out_conv=nn.Sequential(*self.out_conv)
         cur_size/=2
-
+        cur_size=int(cur_size)
         self.linear =[nn.Linear(cur_dim * cur_size * cur_size, 100),
                       nn.LeakyReLU(0.2,True),
                       nn.Linear(100, 1)
                       ]
-
+        self.linear=nn.Sequential(*self.linear)
     def build_conv_block(self,channel_gain):
         model=[
             nn.Conv2d(channel_gain,channel_gain*2,3,1,1,bias=True),

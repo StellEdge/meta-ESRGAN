@@ -6,14 +6,23 @@ from work_header import *
 from PIL import Image
 import random
 
+transform_n=transforms.Compose([
+    transforms.ToTensor(),
+    transforms.Normalize(mean = [ 0.5, 0.5, 0.5 ],std = [ 0.5, 0.5, 0.5 ])
+])
+
 transform=transforms.Compose([
-    transforms.ToTensor()
+    transforms.ToTensor(),
 ])
 
 r_transform=transforms.Compose([
     transforms.ToPILImage()
 ])
 
+r_transform_n=transforms.Compose([
+    transforms.Normalize(mean = [ -1, -1, -1 ],std = [ 2, 2, 2 ]),
+    transforms.ToPILImage()
+])
 IMG_EXTENSIONS = ('.jpg', '.jpeg', '.png', '.ppm', '.bmp', '.pgm', '.tif', '.tiff', '.webp')
 def get_image_tensor(data_origin,transform):
     imgs=os.listdir(data_origin)
@@ -62,8 +71,8 @@ class LRHR_Dataset(Dataset):
         #img_LR=transform(Image.open(self.LR_imgs[index]).convert('RGB'))
         #img_HR=transform(Image.open(self.HR_imgs[index]).convert('RGB'))
         fixed_img_LR,fixed_img_HR=self.cut(index)
-        img_LR=transform(fixed_img_LR)
-        img_HR=transform(fixed_img_HR)
+        img_LR=transform_n(fixed_img_LR)
+        img_HR=transform_n(fixed_img_HR)
         return {
             'LR': img_LR,
             'HR': img_HR,

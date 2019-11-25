@@ -339,3 +339,5 @@ ASALocalRun/
 # BeatPulse healthcheck temp database
 healthchecksdb
 /meta-ESRGAN/dataset/div2k
+/meta-ESRGAN/saved_models/div2k
+/meta-ESRGAN/dataset
