@@ -42,8 +42,8 @@ def get_image_tensor(data_origin,transform):
 def get_pic_dataset(folder_name):
     return LRHR_Dataset(work_folder+folder_name+'/LR',work_folder+folder_name+'/HR')
 
-def get_pic_dataloader(folder_name,batch_size):
-    return DataLoader(get_pic_dataset(folder_name), batch_size, shuffle=True, num_workers=0, drop_last=False)
+def get_pic_dataloader(folder_name,batch_size,n_cpu):
+    return DataLoader(get_pic_dataset(folder_name), batch_size, shuffle=True, num_workers=n_cpu,pin_memory=True, drop_last=False)
 
 class LRHR_Dataset(Dataset):
     def __init__(self,data_path_LR,data_path_HR):

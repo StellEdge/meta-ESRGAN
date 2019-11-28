@@ -12,15 +12,15 @@ import sys
 
 train_phase_name='PSNR'
 parser = argparse.ArgumentParser()
-parser.add_argument("--epoch", type=int, default=50, help="epoch to start training from")
+parser.add_argument("--epoch", type=int, default=0, help="epoch to start training from")
 parser.add_argument("--n_epochs", type=int, default=140, help="number of epochs of training")
 parser.add_argument("--dataset_name", type=str, default="div2k", help="name of the dataset")
-parser.add_argument("--batch_size", type=int, default=1, help="size of the batches")
+parser.add_argument("--batch_size", type=int, default=2, help="size of the batches")
 parser.add_argument("--lr", type=float, default=0.0002, help="adam: learning rate")
 parser.add_argument("--b1", type=float, default=0.9, help="adam: decay of first order momentum of gradient")
 parser.add_argument("--b2", type=float, default=0.99, help="adam: decay of first order momentum of gradient")
 parser.add_argument("--decay_epoch", type=int, default=70, help="epoch from which to start lr decay")
-parser.add_argument("--n_cpu", type=int, default=8, help="number of cpu threads to use during batch generation")
+parser.add_argument("--n_cpu", type=int, default=12, help="number of cpu threads to use during batch generation")
 parser.add_argument("--img_height", type=int, default=256, help="size of image height")
 parser.add_argument("--img_width", type=int, default=256, help="size of image width")
 parser.add_argument("--channels", type=int, default=3, help="number of image channels")
@@ -68,7 +68,7 @@ else:
     # Initialize weights,here smaller sigma is better for trainning
     G.apply(weights_init)
 
-dataloader =get_pic_dataloader("/"+opt.dataset_name,opt.batch_size)
+dataloader =get_pic_dataloader("/"+opt.dataset_name,opt.batch_size,opt.n_cpu)
 temp_save=work_folder+"/psnr_temp"
 def save_sample_images(path,label):
     G.eval()
