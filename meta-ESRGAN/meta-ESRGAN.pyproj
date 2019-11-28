@@ -39,6 +39,9 @@
     <Compile Include="MESRGAN_generator.py">
       <SubType>Code</SubType>
     </Compile>
+    <Compile Include="output.py">
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Include="psnr.py">
       <SubType>Code</SubType>
     </Compile>
