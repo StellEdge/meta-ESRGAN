@@ -27,6 +27,9 @@
     <Compile Include="MESRGAN_discriminator.py">
       <SubType>Code</SubType>
     </Compile>
+    <Compile Include="MESRGAN_metalearner.py">
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Include="MESRGAN_train_PSNR.py">
       <SubType>Code</SubType>
     </Compile>
