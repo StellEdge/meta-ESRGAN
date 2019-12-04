@@ -1,4 +1,12 @@
 #empirical loss
+import copy
+from collections import OrderedDict
+
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+import numpy as np
+from RRDBNet_arch import *
 
 '''
 StellEdge:
@@ -81,11 +89,14 @@ class Net(nn.Module):
                      difference of input size of 'Omniglot' and 'ImageNet'
         """
         super(Net, self).__init__()
+        in_nc=3
+        out_nc=3
+        nf=64
         self.features = nn.Sequential(
-            conv_block(0, in_channels, padding=1, pooling=True),
-            conv_block(1, N_FILTERS, padding=1, pooling=True),
-            conv_block(2, N_FILTERS, padding=1, pooling=True),
-            conv_block(3, N_FILTERS, padding=1, pooling=True))
+            conv_first(in_nc,nf),
+            RRDB_trunk(64,32),
+            else_blocks(out_nc,nf)
+            )
         if dataset == 'Omniglot':
             self.add_module('fc', nn.Linear(64, num_classes))
         elif dataset == 'ImageNet':
@@ -109,71 +120,54 @@ class Net(nn.Module):
             """
             The architecure of functionals is the same as `self`.
             """
-            out = F.conv2d(
+            out=F.conv2d(
                 X,
-                params['meta_learner.features.0.conv0.weight'],
-                params['meta_learner.features.0.conv0.bias'],
+                params['meta_learner.features.0.conv_first.weight'],
+                params['meta_learner.features.0.conv_first.bias'],
                 padding=1)
-            # NOTE we do not need to care about running_mean anv var since
-            # momentum=1.
-            out = F.batch_norm(
-                out,
-                params['meta_learner.features.0.bn0.running_mean'],
-                params['meta_learner.features.0.bn0.running_var'],
-                params['meta_learner.features.0.bn0.weight'],
-                params['meta_learner.features.0.bn0.bias'],
-                momentum=1,
-                training=True)
-            out = F.relu(out, inplace=True)
-            out = F.max_pool2d(out, MP_SIZE)
 
-            out = F.conv2d(
-                out,
-                params['meta_learner.features.1.conv1.weight'],
-                params['meta_learner.features.1.conv1.bias'],
-                padding=1)
-            out = F.batch_norm(
-                out,
-                params['meta_learner.features.1.bn1.running_mean'],
-                params['meta_learner.features.1.bn1.running_var'],
-                params['meta_learner.features.1.bn1.weight'],
-                params['meta_learner.features.1.bn1.bias'],
-                momentum=1,
-                training=True)
-            out = F.relu(out, inplace=True)
-            out = F.max_pool2d(out, MP_SIZE)
+            for trunk_index in range(23):
+                for RDB_index in range(3):
+                    pre="meta_learner.features.1."+str(trunk_index)+"."+str(RDB_index+1)+".RRDB_trunk_"+str(trunk_index)+"_RDB"+str(RDB_index+1)+"_conv"
+                    for i in range(1,6):
+                        out=F.conv2d(
+                            out,
+                            params[pre+str(i)+".weight"],
+                            params[pre+str(i)+".bias"],
+                            padding=1)
+                    out=F.relu(out,inplace=True)
 
-            out = F.conv2d(
+            out=F.conv2d(
                 out,
-                params['meta_learner.features.2.conv2.weight'],
-                params['meta_learner.features.2.conv2.bias'],
+                params['meta_learner.features.2.trunk_conv.weight'],
+                params['meta_learner.features.2.trunk_conv.bias'],
                 padding=1)
-            out = F.batch_norm(
-                out,
-                params['meta_learner.features.2.bn2.running_mean'],
-                params['meta_learner.features.2.bn2.running_var'],
-                params['meta_learner.features.2.bn2.weight'],
-                params['meta_learner.features.2.bn2.bias'],
-                momentum=1,
-                training=True)
-            out = F.relu(out, inplace=True)
-            out = F.max_pool2d(out, MP_SIZE)
 
-            out = F.conv2d(
+            out=F.conv2d(
                 out,
-                params['meta_learner.features.3.conv3.weight'],
-                params['meta_learner.features.3.conv3.bias'],
+                params['meta_learner.features.2.upconv1.weight'],
+                params['meta_learner.features.2.upconv1.bias'],
                 padding=1)
-            out = F.batch_norm(
+
+            out=F.conv2d(
                 out,
-                params['meta_learner.features.3.bn3.running_mean'],
-                params['meta_learner.features.3.bn3.running_var'],
-                params['meta_learner.features.3.bn3.weight'],
-                params['meta_learner.features.3.bn3.bias'],
-                momentum=1,
-                training=True)
-            out = F.relu(out, inplace=True)
-            out = F.max_pool2d(out, MP_SIZE)
+                params['meta_learner.features.2.upconv2.weight'],
+                params['meta_learner.features.2.upconv2.bias'],
+                padding=1)
+
+            out=F.conv2d(
+                out,
+                params['meta_learner.features.2.HRconv.weight'],
+                params['meta_learner.features.2.HRconv.bias'],
+                padding=1)
+
+            out=F.conv2d(
+                out,
+                params['meta_learner.features.2.conv_last.weight'],
+                params['meta_learner.features.2.conv_last.bias'],
+                padding=1)
+
+            out=F.relu(out,inplace=True)
 
             out = out.view(out.size(0), -1)
             out = F.linear(out, params['meta_learner.fc.weight'],
@@ -182,6 +176,88 @@ class Net(nn.Module):
         out = F.log_softmax(out, dim=1)
         return out
 
+def conv_first(in_nc,nf):
+    block = nn.Sequential(OrderedDict([
+            ('conv_first',nn.Conv2d(in_nc, nf, 3, 1, 1, bias=True))
+            ]))
+    return block
+
+def else_blocks(out_nc,nf):
+    block = nn.Sequential(OrderedDict([
+            ('trunk_conv',nn.Conv2d(nf,nf,3,1,1,bias=True)),
+            ('upconv1',nn.Conv2d(nf,nf,3,1,1,bias=True)),
+            ('upconv2',nn.Conv2d(nf,nf,3,1,1,bias=True)),
+            ('HRconv',nn.Conv2d(nf,nf,3,1,1,bias=True)),
+            ('conv_last',nn.Conv2d(nf,out_nc,3,1,1,bias=True)),
+            ('lrelu', nn.LeakyReLU(negative_slope=0.2, inplace=True))
+            ]))
+    return block
+
+def RRDB_trunk(nf,gc):
+    """
+    The RRDB in RRDBNet_arch.py
+    The RRDB trunk contains 23 RRDB blocks.
+    """
+    trunk=nn.Sequential(
+        RRDB_block(0,nf,gc),
+        RRDB_block(1,nf,gc),
+        RRDB_block(2,nf,gc),
+        RRDB_block(3,nf,gc),
+        RRDB_block(4,nf,gc),
+        RRDB_block(5,nf,gc),
+        RRDB_block(6,nf,gc),
+        RRDB_block(7,nf,gc),
+        RRDB_block(8,nf,gc),
+        RRDB_block(9,nf,gc),
+        RRDB_block(10,nf,gc),
+        RRDB_block(11,nf,gc),
+        RRDB_block(12,nf,gc),
+        RRDB_block(13,nf,gc),
+        RRDB_block(14,nf,gc),
+        RRDB_block(15,nf,gc),
+        RRDB_block(16,nf,gc),
+        RRDB_block(17,nf,gc),
+        RRDB_block(18,nf,gc),
+        RRDB_block(19,nf,gc),
+        RRDB_block(20,nf,gc),
+        RRDB_block(21,nf,gc),
+        RRDB_block(22,nf,gc)
+        )
+    return trunk
+
+def RRDB_block(trunk_index,
+               nf,
+               gc=32):
+    """
+    A RRDB block(RRDB_trunk) contains 3 RDB block.
+    Each RDB block contains 5 convolutional layer and 1 ReLU.
+    """
+    block=nn.Sequential(
+        RDB_block(trunk_index,1,nf,gc),
+        RDB_block(trunk_index,2,nf,gc),
+        RDB_block(trunk_index,3,nf,gc)
+        )
+    return block
+
+def RDB_block(trunk_index,
+              RDB_index,
+              nf=64,
+              gc=32,
+              bias=True):
+    """
+    A RDB block contains 5 convolutional layer and 1 ReLU.
+    """
+    pre="RRDB_trunk_"+str(trunk_index)+"_RDB"+str(RDB_index)+"_"
+    block=nn.Sequential(
+        OrderedDict([
+            (pre+'conv1',nn.Conv2d(nf,gc,3,1,1,bias=bias)),
+             (pre+'conv2',nn.Conv2d(nf+gc,gc,3,1,1,bias=bias)),
+             (pre+'conv3',nn.Conv2d(nf+2*gc,gc,3,1,1,bias=bias)),
+             (pre+'conv4',nn.Conv2d(nf+3*gc,gc,3,1,1,bias=bias)),
+             (pre+'conv5',nn.Conv2d(nf+4*gc,gc,3,1,1,bias=bias)),
+             (pre+'lrelu',nn.LeakyReLU(negative_slope=0.2, inplace=True))
+             ]))
+    return block
 
 def conv_block(index,
                in_channels,
