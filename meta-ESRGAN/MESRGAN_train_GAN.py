@@ -20,9 +20,10 @@ parser.add_argument("--dataset_name", type=str, default="div2k", help="name of t
 parser.add_argument("--batch_size", type=int, default=2, help="size of the batches")
 parser.add_argument("--lr", type=float, default=0.0001, help="adam: learning rate")
 parser.add_argument("--b1", type=float, default=0.9, help="adam: decay of first order momentum of gradient")
-parser.add_argument("--b2", type=float, default=0.99, help="adam: decay of first order momentum of gradient")
+parser.add_argument("--b2", type=float, default=0.999, help="adam: decay of first order momentum of gradient")
+parser.add_argument("--start_up_epoch", type=int, default=1, help="epoch from which to end lr increase")
 parser.add_argument("--decay_epoch", type=int, default=100, help="epoch from which to start lr decay")
-parser.add_argument("--n_cpu", type=int, default=8, help="number of cpu threads to use during batch generation")
+parser.add_argument("--n_cpu", type=int, default=0, help="number of cpu threads to use during batch generation")
 parser.add_argument("--img_height", type=int, default=128, help="size of image height")
 parser.add_argument("--img_width", type=int, default=128, help="size of image width")
 parser.add_argument("--channels", type=int, default=3, help="number of image channels")
@@ -68,10 +69,10 @@ dis_params = list(D.parameters())
 optimizer_D= torch.optim.Adam([p for p in dis_params if p.requires_grad], lr=opt.lr, betas=(opt.b1, opt.b2))
 
 lr_scheduler_G = torch.optim.lr_scheduler.LambdaLR(
-    optimizer_G, lr_lambda=LambdaLR(opt.n_epochs, opt.epoch, opt.decay_epoch).step
+    optimizer_G, lr_lambda=LambdaLR(opt.n_epochs, opt.epoch,opt.start_up_epoch, opt.decay_epoch).step
 )
 lr_scheduler_D = torch.optim.lr_scheduler.LambdaLR(
-    optimizer_D, lr_lambda=LambdaLR(opt.n_epochs, opt.epoch, opt.decay_epoch).step
+    optimizer_D, lr_lambda=LambdaLR(opt.n_epochs, opt.epoch,opt.start_up_epoch, opt.decay_epoch).step
 )
 
 

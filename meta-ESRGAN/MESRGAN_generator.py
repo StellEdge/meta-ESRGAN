@@ -6,7 +6,7 @@ import functools
 blocks for RRDB ESRGAN basic
 '''
 class ResidualDenseBlock(nn.Module):
-    def __init__(self, channel_in=64, channel_gain=32,in_block_layer=4,res_alpha=0.2, bias=True):
+    def __init__(self, channel_in=64, channel_gain=32,in_block_layer=4,res_alpha=0.2, bias=False):
         super(ResidualDenseBlock, self).__init__()
         # gc: growth channel, i.e. intermediate channels
         self.conv_layer_list=[]
@@ -52,13 +52,13 @@ def make_layer(block, n_layers):
     return nn.Sequential(*layers)
 
 class RRDBNet(nn.Module):
-    def __init__(self, channel_in, channel_out, channel_flow, block_num, gc=32):
+    def __init__(self, channel_in, channel_out, channel_flow, block_num, gc=32,bias=False):
         super(RRDBNet, self).__init__()
         RRDB_block_f = functools.partial(RRDB,channel_in=channel_flow, channel_gain=gc)
 
-        self.conv_first = nn.Conv2d(channel_in, channel_flow, 3, 1, 1, bias=True)
+        self.conv_first = nn.Conv2d(channel_in, channel_flow, 3, 1, 1, bias=bias)
         self.RRDB_trunk = make_layer(RRDB_block_f, block_num)
-        self.trunk_conv = nn.Conv2d(channel_flow, channel_flow, 3, 1, 1, bias=True)
+        self.trunk_conv = nn.Conv2d(channel_flow, channel_flow, 3, 1, 1, bias=bias)
         #### upsampling
         '''
         self.upsample=[
@@ -74,10 +74,10 @@ class RRDBNet(nn.Module):
         ]
         '''
         
-        self.upconv1 = nn.Conv2d(channel_flow, channel_flow, 3, 1, 1, bias=True)
-        self.upconv2 = nn.Conv2d(channel_flow, channel_flow, 3, 1, 1, bias=True)
-        self.HRconv = nn.Conv2d(channel_flow, channel_flow, 3, 1, 1, bias=True)
-        self.conv_last = nn.Conv2d(channel_flow, channel_out, 3, 1, 1, bias=True)
+        self.upconv1 = nn.Conv2d(channel_flow, channel_flow, 3, 1, 1, bias=bias)
+        self.upconv2 = nn.Conv2d(channel_flow, channel_flow, 3, 1, 1, bias=bias)
+        self.HRconv = nn.Conv2d(channel_flow, channel_flow, 3, 1, 1, bias=bias)
+        self.conv_last = nn.Conv2d(channel_flow, channel_out, 3, 1, 1, bias=bias)
 
         self.lrelu = nn.LeakyReLU(negative_slope=0.2, inplace=True)
         
@@ -92,4 +92,13 @@ class RRDBNet(nn.Module):
         fea = self.lrelu(self.upconv1(F.interpolate(fea, scale_factor=2, mode='nearest')))
         fea = self.lrelu(self.upconv2(F.interpolate(fea, scale_factor=2, mode='nearest')))
         out = self.conv_last(self.lrelu(self.HRconv(fea)))        
+        return out
+    def get_RRDB_out_features(self,x):
+        fea = self.conv_first(x)
+        trunk = self.trunk_conv(self.RRDB_trunk(fea))
+        fea = fea + trunk
+
+        fea = F.interpolate(fea, scale_factor=2, mode='nearest')
+        fea = F.interpolate(fea, scale_factor=2, mode='nearest')
+        out = self.conv_last(fea)        
         return out
