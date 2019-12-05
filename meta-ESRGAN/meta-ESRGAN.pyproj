@@ -4,7 +4,7 @@
     <SchemaVersion>2.0</SchemaVersion>
     <ProjectGuid>d9daa95b-54f9-453f-8c4f-8aab8c492279</ProjectGuid>
     <ProjectHome>.</ProjectHome>
-    <StartupFile>output.py</StartupFile>
+    <StartupFile>test.py</StartupFile>
     <SearchPath>
     </SearchPath>
     <WorkingDirectory>.</WorkingDirectory>
@@ -31,6 +31,7 @@
     <Compile Include="MESRGAN_metalearner.py">
       <SubType>Code</SubType>
     </Compile>
+    <Compile Include="MESRGAN_RRDB_meta.py" />
     <Compile Include="MESRGAN_train_meta.py">
       <SubType>Code</SubType>
     </Compile>
@@ -52,6 +53,7 @@
     <Compile Include="RRDBNet_arch.py">
       <SubType>Code</SubType>
     </Compile>
+    <Compile Include="test.py" />
     <Compile Include="Utils.py">
       <SubType>Code</SubType>
     </Compile>
