@@ -68,7 +68,7 @@ class ResidualDenseBlock_meta(nn.Module):
                 temp_middle=F.conv2d(torch.cat(x_res,1),
                                     params[state_dict_param+'.weight'],
                                     padding=1)
-            x_res.append(F.leaky_relu(temp_middle))
+            x_res.append(F.leaky_relu(temp_middle,inplace=True))
         if(BIAS):
             x_out = F.conv2d(torch.cat(x_res, 1),
                              params[state_dict_param_pre+'4.weight'],
@@ -178,15 +178,15 @@ class RRDBNet_meta(nn.Module):
                 fea=F.leaky_relu(F.conv2d(F.interpolate(fea, scale_factor=2, mode='nearest'),
                                           params['upconv1.weight'],
                                           params['upconv1.bias'],
-                                          padding=1))
+                                          padding=1),inplace=True)
                 fea=F.leaky_relu(F.conv2d(F.interpolate(fea, scale_factor=2, mode='nearest'),
                                           params['upconv2.weight'],
                                           params['upconv2.bias'],
-                                          padding=1))
+                                          padding=1),inplace=True)
                 fea=F.leaky_relu(F.conv2d(fea,
                                           params['HRconv.weight'],
                                           params['HRconv.bias'],
-                                          padding=1))
+                                          padding=1),inplace=True)
                 out=F.conv2d(fea,
                              params['conv_last.weight'],
                              params['conv_last.bias'],
@@ -199,13 +199,13 @@ class RRDBNet_meta(nn.Module):
                 fea=fea+trunk
                 fea=F.leaky_relu(F.conv2d(F.interpolate(fea, scale_factor=2, mode='nearest'),
                                           params['upconv1.weight'],
-                                          padding=1))
+                                          padding=1),inplace=True)
                 fea=F.leaky_relu(F.conv2d(F.interpolate(fea, scale_factor=2, mode='nearest'),
                                           params['upconv2.weight'],
-                                          padding=1))
+                                          padding=1),inplace=True)
                 fea=F.leaky_relu(F.conv2d(fea,
                                           params['HRconv.weight'],
-                                          padding=1))
+                                          padding=1),inplace=True)
                 out=F.conv2d(fea,
                              params['conv_last.weight'],
                              padding=1)
