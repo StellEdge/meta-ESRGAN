@@ -43,7 +43,8 @@ class MetaLearner(nn.Module):
         super(MetaLearner, self).__init__()
         self.params = params
         self.meta_learner = Net(
-            params.in_channels, params.num_classes, dataset=params.dataset)
+            params.channels,3, 64, opt.n_residual_blocks, gc=32,bias=False, dataset=params.dataset_name)
+        #G=RRDBNet(3, 3, 64, opt.n_residual_blocks, gc=32) #origin 23 blocks
         self.task_lr = OrderedDict()
 
     def forward(self, X, adapted_params=None):
@@ -74,35 +75,27 @@ class Net(nn.Module):
     The base CNN model for Meta-SGD for few-shot learning.
     """
 
-    def __init__(self, in_channels, num_classes, dataset='Omniglot'):
-        """
-        self.net returns:
-            [N, 64, 1, 1] for Omniglot (28x28)
-            [N, 64, 5, 5] for miniImageNet (84x84)
-        self.fc returns:
-            [N, num_classes]
-        
-        Args:
-            in_channels: number of input channels feeding into first conv_block
-            num_classes: number of classes for the task
-            dataset: for the measure of input units for self.fc, caused by 
-                     difference of input size of 'Omniglot' and 'ImageNet'
-        """
+    def __init__(self, in_channels, channel_out, channel_flow, block_num, gc=32,bias=False, dataset='div2k'):
+
         super(Net, self).__init__()
         in_nc=3
         out_nc=3
         nf=64
         self.features = nn.Sequential(
-            conv_first(in_nc,nf),
+            conv_first(in_channels,nf),
             RRDB_trunk(64,32),
             else_blocks(out_nc,nf)
             )
+        '''
+        #no use here for classification works
         if dataset == 'Omniglot':
             self.add_module('fc', nn.Linear(64, num_classes))
         elif dataset == 'ImageNet':
             self.add_module('fc', nn.Linear(64 * 5 * 5, num_classes))
         else:
             raise Exception("I don't know your dataset")
+        '''
+
 
     def forward(self, X, params=None):
         """

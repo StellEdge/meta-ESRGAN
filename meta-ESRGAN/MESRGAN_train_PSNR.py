@@ -10,6 +10,8 @@ import datetime
 import time
 import sys
 from PIL import Image
+import matplotlib.pyplot as plt
+import numpy as np
 
 train_phase_name='PSNR'
 parser = argparse.ArgumentParser()
@@ -38,7 +40,7 @@ show_debug=True
 
 cuda = torch.cuda.is_available()
 
-#Tensor = torch.cuda.FloatTensor if cuda else torch.Tensor
+Tensor = torch.cuda.FloatTensor if cuda else torch.Tensor
 
 '''
 Loss loss_G=loss_per+lamda*loss
@@ -89,8 +91,10 @@ def save_sample_images(path,label):
         break
     G.train()
 
+history_loss=[]
 prev_time = time.time()
 for epoch in range(opt.epoch, opt.n_epochs):
+    cur_epoch_loss=[]
     for i, batch in enumerate(dataloader):
         G.train()
         optimizer_G.zero_grad()
@@ -103,7 +107,7 @@ for epoch in range(opt.epoch, opt.n_epochs):
         loss_G=loss_psnr(fake,ground_truth)
         loss_G.backward()
         optimizer_G.step()
-
+        cur_epoch_loss.append(loss_G.item())
         # Determine approximate time left
         batches_done = epoch * len(dataloader) + i
         batches_left = opt.n_epochs * len(dataloader) - batches_done
@@ -127,7 +131,16 @@ for epoch in range(opt.epoch, opt.n_epochs):
             #sample_transform(temp_save,str(epoch))
             save_sample_images(temp_save,str(epoch)+'_'+str(i))
     # Update learning rates
-
+    history_loss.append(torch.mean(Tensor(cur_epoch_loss)))
+    los_avg = plt.subplot()
+    los_avg.plot(history_loss, label="loss")
+    plt.xlabel
+    plt.xlabel("train iterations")
+    plt.ylabel("loss")
+    plt.title("losses per iteration")
+    plt.savefig(temp_save + "/loss.jpg")
+    plt.clf()
+    plt.close()
     lr_scheduler_G.step()
     if opt.checkpoint_interval != -1 and epoch % opt.checkpoint_interval == 0 and epoch!=0:
         # Save model checkpoints
