@@ -28,10 +28,10 @@ while not None do:
 product.
 
 '''
-BIAS=False
+BIAS=True
 
 class ResidualDenseBlock_meta(nn.Module):
-    def __init__(self, channel_in=64, channel_gain=32,in_block_layer=4,res_alpha=0.2, bias=False):
+    def __init__(self, channel_in=64, channel_gain=32,in_block_layer=4,res_alpha=0.2, bias=BIAS):
         super(ResidualDenseBlock_meta, self).__init__()
         # gc: growth channel, i.e. intermediate channels
         self.conv_layer_list=[]
@@ -63,12 +63,12 @@ class ResidualDenseBlock_meta(nn.Module):
                 temp_middle=F.conv2d(torch.cat(x_res,1),
                                     params[state_dict_param+'.weight'],
                                     params[state_dict_param+'.bias'],
-                                    padding=1)
+                                    stride=1,padding=1)
             else:
                 temp_middle=F.conv2d(torch.cat(x_res,1),
-                                    params[state_dict_param+'.weight'],
-                                    padding=1)
-            x_res.append(F.leaky_relu(temp_middle,inplace=True))
+                                    params[state_dict_param+'.weight'],None,
+                                    stride=1,padding=1)
+            x_res.append(F.leaky_relu(temp_middle,negative_slope=0.2,inplace=True)) #well
         if(BIAS):
             x_out = F.conv2d(torch.cat(x_res, 1),
                              params[state_dict_param_pre+'4.weight'],
@@ -76,7 +76,8 @@ class ResidualDenseBlock_meta(nn.Module):
                                     padding=1)
         else:
             x_out = F.conv2d(torch.cat(x_res, 1),
-                             params[state_dict_param_pre+'4.weight'],
+                             params[state_dict_param_pre+'4.weight'],None,
+                                    stride=1,
                                     padding=1)
         return x_out * self.res_alpha + x
 
@@ -110,7 +111,7 @@ def make_layer(block, n_layers):
     return nn.Sequential(*layers)
 
 class RRDBNet_meta(nn.Module):
-    def __init__(self, channel_in, channel_out, channel_flow, block_num, gc=32,bias=False):
+    def __init__(self, channel_in, channel_out, channel_flow, block_num, gc=32,bias=BIAS):
         super(RRDBNet_meta, self).__init__()
         RRDB_block_f = functools.partial(RRDB_meta,channel_in=channel_flow, channel_gain=gc)
 
@@ -157,11 +158,11 @@ class RRDBNet_meta(nn.Module):
                 fea=F.conv2d(x,
                             params['conv_first.weight'],
                             params['conv_first.bias'],
-                                    padding=1)
+                                    stride=1,padding=1)
             else:
                 fea=F.conv2d(x,
-                            params['conv_first.weight'],
-                                    padding=1)
+                            params['conv_first.weight'],None,
+                                    stride=1,padding=1)
 
             trunk_index=0
             trunk=fea
@@ -173,42 +174,42 @@ class RRDBNet_meta(nn.Module):
                 trunk=F.conv2d(trunk,
                                params['trunk_conv.weight'],
                                params['trunk_conv.bias'],
-                               padding=1)
+                               stride=1,padding=1)
                 fea=fea+trunk
                 fea=F.leaky_relu(F.conv2d(F.interpolate(fea, scale_factor=2, mode='nearest'),
                                           params['upconv1.weight'],
                                           params['upconv1.bias'],
-                                          padding=1),inplace=True)
+                                          stride=1,padding=1),negative_slope=0.2,inplace=True)
                 fea=F.leaky_relu(F.conv2d(F.interpolate(fea, scale_factor=2, mode='nearest'),
                                           params['upconv2.weight'],
                                           params['upconv2.bias'],
-                                          padding=1),inplace=True)
+                                          stride=1,padding=1),negative_slope=0.2,inplace=True)
                 fea=F.leaky_relu(F.conv2d(fea,
                                           params['HRconv.weight'],
                                           params['HRconv.bias'],
-                                          padding=1),inplace=True)
+                                          stride=1,padding=1),negative_slope=0.2,inplace=True)
                 out=F.conv2d(fea,
                              params['conv_last.weight'],
                              params['conv_last.bias'],
-                             padding=1)
+                             stride=1,padding=1)
                 return out
             else:
                 trunk=F.conv2d(trunk,
-                               params['trunk_conv.weight'],
-                               padding=1)
+                               params['trunk_conv.weight'],None,
+                               stride=1,padding=1)
                 fea=fea+trunk
                 fea=F.leaky_relu(F.conv2d(F.interpolate(fea, scale_factor=2, mode='nearest'),
-                                          params['upconv1.weight'],
-                                          padding=1),inplace=True)
+                                          params['upconv1.weight'],None,
+                                          stride=1,padding=1),negative_slope=0.2,inplace=True)
                 fea=F.leaky_relu(F.conv2d(F.interpolate(fea, scale_factor=2, mode='nearest'),
-                                          params['upconv2.weight'],
-                                          padding=1),inplace=True)
+                                          params['upconv2.weight'],None,
+                                          stride=1,padding=1),negative_slope=0.2,inplace=True)
                 fea=F.leaky_relu(F.conv2d(fea,
-                                          params['HRconv.weight'],
-                                          padding=1),inplace=True)
+                                          params['HRconv.weight'],None,
+                                          stride=1,padding=1),negative_slope=0.2,inplace=True)
                 out=F.conv2d(fea,
-                             params['conv_last.weight'],
-                             padding=1)
+                             params['conv_last.weight'],None,
+                             stride=1,padding=1)
                 return out
 
 

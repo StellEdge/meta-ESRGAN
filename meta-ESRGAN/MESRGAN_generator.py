@@ -6,7 +6,7 @@ import functools
 blocks for RRDB ESRGAN basic
 '''
 class ResidualDenseBlock(nn.Module):
-    def __init__(self, channel_in=64, channel_gain=32,in_block_layer=4,res_alpha=0.2, bias=False):
+    def __init__(self, channel_in=64, channel_gain=32,in_block_layer=4,res_alpha=0.2, bias=True):
         super(ResidualDenseBlock, self).__init__()
         # gc: growth channel, i.e. intermediate channels
         self.conv_layer_list=[]
@@ -52,7 +52,7 @@ def make_layer(block, n_layers):
     return nn.Sequential(*layers)
 
 class RRDBNet(nn.Module):
-    def __init__(self, channel_in, channel_out, channel_flow, block_num, gc=32,bias=False):
+    def __init__(self, channel_in, channel_out, channel_flow, block_num, gc=32,bias=True):
         super(RRDBNet, self).__init__()
         RRDB_block_f = functools.partial(RRDB,channel_in=channel_flow, channel_gain=gc)
 
@@ -60,20 +60,7 @@ class RRDBNet(nn.Module):
         self.RRDB_trunk = make_layer(RRDB_block_f, block_num)
         self.trunk_conv = nn.Conv2d(channel_flow, channel_flow, 3, 1, 1, bias=bias)
         #### upsampling
-        '''
-        self.upsample=[
-            F.interpolate(fea, scale_factor=2, mode='nearest'),
-            nn.Conv2d(channel_flow, channel_flow, 3, 1, 1, bias=True),
-            nn.LeakyReLU(negative_slope=0.2, inplace=True),
-            F.interpolate(fea, scale_factor=2, mode='nearest'),
-            nn.Conv2d(channel_flow, channel_flow, 3, 1, 1, bias=True),
-            nn.LeakyReLU(negative_slope=0.2, inplace=True),
-            nn.Conv2d(channel_flow, channel_flow, 3, 1, 1, bias=True),
-            nn.LeakyReLU(negative_slope=0.2, inplace=True),
-            nn.Conv2d(channel_flow, channel_out, 3, 1, 1, bias=True)
-        ]
-        '''
-        
+     
         self.upconv1 = nn.Conv2d(channel_flow, channel_flow, 3, 1, 1, bias=bias)
         self.upconv2 = nn.Conv2d(channel_flow, channel_flow, 3, 1, 1, bias=bias)
         self.HRconv = nn.Conv2d(channel_flow, channel_flow, 3, 1, 1, bias=bias)

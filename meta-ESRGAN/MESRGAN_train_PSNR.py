@@ -15,7 +15,7 @@ import numpy as np
 
 train_phase_name='PSNR'
 parser = argparse.ArgumentParser()
-parser.add_argument("--epoch", type=int, default=0, help="epoch to start training from")
+parser.add_argument("--epoch", type=int, default=20, help="epoch to start training from")
 parser.add_argument("--n_epochs", type=int, default=140, help="number of epochs of training")
 parser.add_argument("--dataset_name", type=str, default="div2k", help="name of the dataset")
 parser.add_argument("--batch_size", type=int, default=1, help="size of the batches")
@@ -29,7 +29,7 @@ parser.add_argument("--img_height", type=int, default=256, help="size of image h
 parser.add_argument("--img_width", type=int, default=256, help="size of image width")
 parser.add_argument("--channels", type=int, default=3, help="number of image channels")
 parser.add_argument("--sample_interval", type=int, default=200, help="interval between saving generator outputs")
-parser.add_argument("--checkpoint_interval", type=int, default=10, help="interval between saving model checkpoints")
+parser.add_argument("--checkpoint_interval", type=int, default=5, help="interval between saving model checkpoints")
 parser.add_argument("--n_residual_blocks", type=int, default=23, help="number of residual blocks in generator")
 
 #6 res loss->0.05 ->GAN:DEAD
@@ -107,7 +107,8 @@ for epoch in range(opt.epoch, opt.n_epochs):
         loss_G=loss_psnr(fake,ground_truth)
         loss_G.backward()
         optimizer_G.step()
-        cur_epoch_loss.append(loss_G.item())
+        #cur_epoch_loss.append(loss_G.item())
+        history_loss.append(loss_G.item())
         # Determine approximate time left
         batches_done = epoch * len(dataloader) + i
         batches_left = opt.n_epochs * len(dataloader) - batches_done
@@ -131,7 +132,7 @@ for epoch in range(opt.epoch, opt.n_epochs):
             #sample_transform(temp_save,str(epoch))
             save_sample_images(temp_save,str(epoch)+'_'+str(i))
     # Update learning rates
-    history_loss.append(torch.mean(Tensor(cur_epoch_loss)))
+    #history_loss.append(torch.mean(Tensor(cur_epoch_loss)))
     los_avg = plt.subplot()
     los_avg.plot(history_loss, label="loss")
     plt.xlabel

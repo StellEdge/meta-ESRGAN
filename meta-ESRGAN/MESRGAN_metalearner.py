@@ -6,7 +6,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
-from RRDBNet_arch import *
+#from RRDBNet_arch import *
+#from MESRGAN_generator import *
 
 '''
 StellEdge:
@@ -35,6 +36,50 @@ K_SIZE = 3  # size of kernel
 MP_SIZE = 2  # size of max pooling
 EPS = 1e-8  # epsilon for numerical stability
 
+class ResidualDenseBlock_indexed(nn.Module):
+    def __init__(self,index, channel_in=64, channel_gain=32,in_block_layer=4,res_alpha=0.2, bias=False):
+        super(ResidualDenseBlock_indexed, self).__init__()
+        # gc: growth channel, i.e. intermediate channels
+        self.conv_layer_list=OrderedDict()
+        self.in_block_layer=in_block_layer
+        self.res_alpha=res_alpha 
+        for i in range(in_block_layer):
+            self.conv_layer_list.append(('name',nn.Conv2d(channel_in+i*channel_gain,channel_gain, 3, 1, 1, bias=bias)))
+        self.conv_layer_list.append(nn.Conv2d(channel_in+in_block_layer*channel_gain,  channel_in, 3, 1, 1, bias=bias))
+        self.conv_layer_list=nn.ModuleList(self.conv_layer_list)
+        self.lrelu = nn.LeakyReLU(negative_slope=0.2, inplace=True)
+
+    def forward(self, x):
+        x_res=[]
+        x_res.append(x)
+        for i in range(self.in_block_layer):
+            x_res.append( self.lrelu(self.conv_layer_list[i](torch.cat(x_res, 1))))
+        x_out = self.conv_layer_list[-1](torch.cat(x_res, 1))
+        return x_out * self.res_alpha + x
+
+class RRDB_indexed(nn.Module):
+    '''Residual in Residual Dense Block'''
+
+    def __init__(self,  channel_in=64, channel_gain=32,block_num=3,res_alpha=0.2):
+        super(RRDB, self).__init__()
+        self.blocks=[]
+        self.block_num=block_num
+        self.res_alpha=res_alpha
+        for _ in range(block_num):
+            self.blocks.append(ResidualDenseBlock( channel_in, channel_gain))
+        self.blocks=nn.ModuleList(self.blocks)
+    def forward(self, x):
+        out=x
+        for i in range(self.block_num):
+            out=self.blocks[i](out)
+        return out * self.res_alpha + x
+
+def make_layer(block, n_layers):
+    layers = []
+    for _ in range(n_layers):
+        layers.append(block())
+    return nn.Sequential(*layers)
+
 class MetaLearner(nn.Module):
     """
     The class defines meta-learner for Meta-SGD algorithm.
@@ -49,7 +94,7 @@ class MetaLearner(nn.Module):
 
     def forward(self, X, adapted_params=None):
         if adapted_params == None:
-            out = self.meta_learner(X)
+            out = self.meta_learner(X) 
         else:
             out = self.meta_learner(X, adapted_params)
         return out
@@ -72,46 +117,33 @@ class MetaLearner(nn.Module):
 
 class Net(nn.Module):
     """
-    The base CNN model for Meta-SGD for few-shot learning.
+    RRDBNet for Meta-SGD for few-shot learning.
     """
 
-    def __init__(self, in_channels, channel_out, channel_flow, block_num, gc=32,bias=False, dataset='div2k'):
+    def __init__(self, channel_in, channel_out, channel_flow, block_num, gc=32,bias=False, dataset='div2k'):
 
         super(Net, self).__init__()
-        in_nc=3
-        out_nc=3
-        nf=64
+        '''
         self.features = nn.Sequential(
-            conv_first(in_channels,nf),
-            RRDB_trunk(64,32),
-            else_blocks(out_nc,nf)
+            conv_first(channel_in,channel_flow),
+            RRDB_trunk(channel_flow,gc),
+            else_blocks(channel_out,channel_flow)
             )
         '''
-        #no use here for classification works
-        if dataset == 'Omniglot':
-            self.add_module('fc', nn.Linear(64, num_classes))
-        elif dataset == 'ImageNet':
-            self.add_module('fc', nn.Linear(64 * 5 * 5, num_classes))
-        else:
-            raise Exception("I don't know your dataset")
-        '''
-
-
+        self.conv_first = conv_first(channel_in,channel_flow)
+        self.RRDB_trunk = make_layer(RRDB_block_f, block_num)
+        self.trunk_conv = nn.Conv2d(channel_flow, channel_flow, 3, 1, 1, bias=bias)
     def forward(self, X, params=None):
-        """
-        Args:
-            X: [N, in_channels, W, H]
-            params: a state_dict()
-        Returns:
-            out: [N, num_classes] unnormalized score for each class
-        """
+
         if params == None:
-            out = self.features(X)
-            out = out.view(out.size(0), -1)
-            out = self.fc(out)
+            #normal forward
+
+
         else:
             """
             The architecure of functionals is the same as `self`.
+            Here use F because no params will be saved.
+            Only gradent will pass through. 
             """
             out=F.conv2d(
                 X,

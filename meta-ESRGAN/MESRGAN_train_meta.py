@@ -11,7 +11,9 @@ import time
 import sys
 from PIL import Image
 from MESRGAN_metalearner import MetaLearner
-from MESRGAN_metalearner import Net
+#from MESRGAN_metalearner import Net
+
+from MESRGAN_discriminator import *
 
 train_phase_name='meta-SGD'
 parser = argparse.ArgumentParser()
@@ -21,7 +23,7 @@ parser.add_argument("--dataset_name", type=str, default="div2k", help="name of t
 parser.add_argument("--batch_size", type=int, default=2, help="size of the batches")
 parser.add_argument("--lr", type=float, default=0.0002, help="adam: learning rate")
 parser.add_argument("--b1", type=float, default=0.9, help="adam: decay of first order momentum of gradient")
-parser.add_argument("--b2", type=float, default=0.99, help="adam: decay of first order momentum of gradient")
+parser.add_argument("--b2", type=float, default=0.999, help="adam: decay of first order momentum of gradient")
 parser.add_argument("--decay_epoch", type=int, default=70, help="epoch from which to start lr decay")
 parser.add_argument("--n_cpu", type=int, default=0, help="number of cpu threads to use during batch generation")
 parser.add_argument("--img_height", type=int, default=256, help="size of image height")
@@ -31,6 +33,11 @@ parser.add_argument("--sample_interval", type=int, default=200, help="interval b
 parser.add_argument("--checkpoint_interval", type=int, default=10, help="interval between saving model checkpoints")
 parser.add_argument("--n_residual_blocks", type=int, default=23, help="number of residual blocks in generator")
 
+#meta_optimizer.state_dict()
+parser.add_argument("--saved_meta_optimizer_path",type=str,default=None,help="path of saved model")
+#输入模型路径"saved_models/div2k/G_meta_0.pth"
+parser.add_argument("--saved_model_path",type=str,default=None,help="path of saved model")
+
 opt = parser.parse_args()
 
 show_debug=True
@@ -38,15 +45,34 @@ show_debug=True
 cuda = torch.cuda.is_available()
 
 model=MetaLearner(opt)
+#will we need a discriminator?
+#D=discriminator_VGG(channel_in=3,channel_gain=64,input_size=512)
 
-model.define_task_lr_params()
-model_params = list(model.parameters()) + list(model.task_lr.values())
-meta_optimizer = torch.optim.Adam(model_params, lr=opt.lr)
+
 #adam optimizer
 
 # fetch loss function and metrics
-loss_fn = nn.NLLLoss()
-model_metrics = metrics
+Loss_per=nn.MSELoss()
+Loss_L1=nn.L1Loss()
+Loss_adv=nn.BCEWithLogitsLoss()
+
+#currently unused--for evalution
+#model_metrics = metrics
+
+if cuda:
+    model = model.cuda()
+    D=D.cuda()
+    Loss_per=Loss_per.cuda()
+    Loss_L1=Loss_L1.cuda()
+    Loss_adv=Loss_adv.cuda()
+    VGG_ext=VGGFeatureExtractor(device=torch.device('cuda'))
+    VGG_ext=VGG_ext.cuda()
+else:
+    VGG_ext=VGGFeatureExtractor(device=torch.device('cpu'))
+model.define_task_lr_params()
+model_params = list(model.parameters()) + list(model.task_lr.values())
+meta_optimizer = torch.optim.Adam(model_params, lr=opt.lr,betas=(opt.b1, opt.b2))
+
 
 if opt.epoch != 0:
     # Load pretrained models
@@ -57,12 +83,64 @@ else:
 
 dataloader =get_pic_dataloader("/"+opt.dataset_name,opt.batch_size,opt.n_cpu)
 temp_save=work_folder+"/meta_SGD_temp"
+
+def train_single_task(model, loss_fn, dataloaders, params):
+    """
+    Train the model on a single few-shot task.
+    We train the model with single or multiple gradient update.
+    
+    Args:
+        model: (MetaLearner) a meta-learner to be adapted for a new task
+        loss_fn: a loss function
+        dataloaders: (dict) a dict of DataLoader objects that fetches both of 
+                     support set and query set
+        params: (Params) hyperparameters
+    """
+    # set model to training mode
+    model.train()
+
+    # support set for a single few-shot task
+    dl_sup = dataloaders['train']
+    batch = dl_sup.__iter__().next()
+    lr_img=batch["LR"]
+    hr_img=batch["HR"]
+    if params.cuda:
+        lr_img, hr_img = lr_img.cuda(async=True), hr_img.cuda(async=True)
+
+    # compute model output and loss
+    fake_hr_img = model(lr_img)
+    loss = loss_fn(fake_hr_img, hr_img)
+
+    # clear previous gradients, compute gradients of all variables wrt loss
+    def zero_grad(params):
+        for p in params:
+            if p.grad is not None:
+                p.grad.zero_()
+
+    # NOTE if we want approx-MAML, change create_graph=True to False
+    zero_grad(model.parameters())
+    grads = torch.autograd.grad(loss, model.parameters(), create_graph=True)
+
+    # performs updates using calculated gradients
+    # we manually compute adpated parameters since optimizer.step() operates in-place
+    adapted_state_dict = model.cloned_state_dict()
+    adapted_params = OrderedDict()
+    for (key, val), grad in zip(model.named_parameters(), grads):
+        # NOTE Here Meta-SGD is different from naive MAML
+        # Also we only need single update of inner gradient update
+        task_lr = model.task_lr[key]
+        adapted_params[key] = val - task_lr * grad
+        adapted_state_dict[key] = adapted_params[key]
+
+    return adapted_state_dict
+
 def train_and_evaluate(model,
                        meta_optimizer,
                        loss_fn,
                        metrics,
                        params,
-                       model_dir,):
+                       model_dir,
+                       restore_file):
     """
     Train the model and evaluate every `save_summary_steps`.
 
@@ -83,6 +161,7 @@ def train_and_evaluate(model,
     """
     # reload weights from restore_file if specified
     if restore_file is not None:
+
         restore_path = os.path.join(args.model_dir,
                                     args.restore_file + '.pth.tar')
         logging.info("Restoring parameters from {}".format(restore_path))
@@ -219,3 +298,8 @@ def train_and_evaluate(model,
                 print('\n')
 
             t.update()
+
+train_and_evaluate(model, meta_train_classes, meta_val_classes,
+                    meta_test_classes, task_type, meta_optimizer, loss_fn,
+                    model_metrics, params, args.model_dir,
+                    args.restore_file)
