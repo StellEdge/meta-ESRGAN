@@ -343,3 +343,4 @@ healthchecksdb
 /meta-ESRGAN/dataset
 /model
 /temp
+/meta-ESRGAN/saved_models

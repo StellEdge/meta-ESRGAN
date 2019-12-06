@@ -15,10 +15,10 @@ import numpy as np
 
 train_phase_name='PSNR'
 parser = argparse.ArgumentParser()
-parser.add_argument("--epoch", type=int, default=20, help="epoch to start training from")
+parser.add_argument("--epoch", type=int, default=0, help="epoch to start training from")
 parser.add_argument("--n_epochs", type=int, default=140, help="number of epochs of training")
 parser.add_argument("--dataset_name", type=str, default="div2k", help="name of the dataset")
-parser.add_argument("--batch_size", type=int, default=1, help="size of the batches")
+parser.add_argument("--batch_size", type=int, default=2, help="size of the batches")
 parser.add_argument("--lr", type=float, default=0.0002, help="adam: learning rate")
 parser.add_argument("--b1", type=float, default=0.9, help="adam: decay of first order momentum of gradient")
 parser.add_argument("--b2", type=float, default=0.999, help="adam: decay of first order momentum of gradient")
@@ -30,7 +30,7 @@ parser.add_argument("--img_width", type=int, default=256, help="size of image wi
 parser.add_argument("--channels", type=int, default=3, help="number of image channels")
 parser.add_argument("--sample_interval", type=int, default=200, help="interval between saving generator outputs")
 parser.add_argument("--checkpoint_interval", type=int, default=5, help="interval between saving model checkpoints")
-parser.add_argument("--n_residual_blocks", type=int, default=23, help="number of residual blocks in generator")
+parser.add_argument("--n_residual_blocks", type=int, default=12, help="number of residual blocks in generator")
 
 #6 res loss->0.05 ->GAN:DEAD
 
