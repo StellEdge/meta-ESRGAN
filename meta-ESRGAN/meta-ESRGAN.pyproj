@@ -29,13 +29,11 @@
     <Compile Include="MESRGAN_discriminator.py">
       <SubType>Code</SubType>
     </Compile>
-    <Compile Include="MESRGAN_metalearner.py">
-      <SubType>Code</SubType>
-    </Compile>
     <Compile Include="MESRGAN_RRDB_meta.py" />
     <Compile Include="MESRGAN_train_meta.py">
       <SubType>Code</SubType>
     </Compile>
+    <Compile Include="MESRGAN_train_HSV.py" />
     <Compile Include="MESRGAN_train_PSNR.py">
       <SubType>Code</SubType>
     </Compile>
@@ -45,13 +43,16 @@
     <Compile Include="MESRGAN_generator.py">
       <SubType>Code</SubType>
     </Compile>
+    <Compile Include="net_interpolate.py">
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Include="output.py">
       <SubType>Code</SubType>
     </Compile>
     <Compile Include="psnr.py">
       <SubType>Code</SubType>
     </Compile>
-    <Compile Include="RRDBNet_arch.py">
+    <Compile Include="testa.py">
       <SubType>Code</SubType>
     </Compile>
     <Compile Include="Utils.py">

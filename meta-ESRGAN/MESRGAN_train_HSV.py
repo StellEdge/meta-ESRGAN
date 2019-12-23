@@ -13,12 +13,12 @@ from PIL import Image
 import matplotlib.pyplot as plt
 import numpy as np
 
-train_phase_name='PSNR'
+train_phase_name='HSV'
 parser = argparse.ArgumentParser()
-parser.add_argument("--epoch", type=int, default=10, help="epoch to start training from")
+parser.add_argument("--epoch", type=int, default=5, help="epoch to start training from")
 parser.add_argument("--n_epochs", type=int, default=201, help="number of epochs of training")
 parser.add_argument("--dataset_name", type=str, default="div2k", help="name of the dataset")
-parser.add_argument("--batch_size", type=int, default=8, help="size of the batches")
+parser.add_argument("--batch_size", type=int, default=4, help="size of the batches")
 parser.add_argument("--lr", type=float, default=0.0002, help="adam: learning rate")
 parser.add_argument("--b1", type=float, default=0.9, help="adam: decay of first order momentum of gradient")
 parser.add_argument("--b2", type=float, default=0.999, help="adam: decay of first order momentum of gradient")
@@ -30,7 +30,9 @@ parser.add_argument("--img_width", type=int, default=256, help="size of image wi
 parser.add_argument("--channels", type=int, default=3, help="number of image channels")
 parser.add_argument("--sample_interval", type=int, default=200, help="interval between saving generator outputs")
 parser.add_argument("--checkpoint_interval", type=int, default=5, help="interval between saving model checkpoints")
-parser.add_argument("--n_residual_blocks", type=int, default=3, help="number of residual blocks in generator")
+parser.add_argument("--n_residual_blocks", type=int, default=6, help="number of residual blocks in generator")
+
+#6 res loss->0.05 ->GAN:DEAD
 
 opt = parser.parse_args()
 
@@ -44,25 +46,22 @@ Tensor = torch.cuda.FloatTensor if cuda else torch.Tensor
 Loss loss_G=loss_per+lamda*loss
 '''
 #psnr_loss=PSNRLoss()
-Loss_psnr=nn.L1Loss()
-#Loss_hsv=HSVLoss(1,1) #H,S,V=1:1:1
-G=RRDBNet(3, 3, 64, opt.n_residual_blocks, gc=24) #origin 23 blocks
-#_shuffle_flatten
-
+#Loss_psnr=nn.L1Loss()
+Loss_lab=LABLoss()
+G=RRDBNet_shuffle(3, 3, 64, opt.n_residual_blocks, gc=32) #origin 23 blocks
 
 if cuda:
     print("Using CUDA.")
     G = G.cuda()
-    Loss_psnr=Loss_psnr.cuda()
-    #Loss_hsv=Loss_hsv.cuda()
+    #Loss_psnr=Loss_psnr.cuda()
+    Loss_lab=Loss_lab.cuda()
 
 gen_params = list(G.parameters())
-optimizer_G = torch.optim.Adam([p for p in gen_params if p.requires_grad],lr=opt.lr/opt.batch_size, betas=(opt.b1, opt.b2))
+optimizer_G = torch.optim.Adam([p for p in gen_params if p.requires_grad],lr=opt.lr/(32/opt.batch_size), betas=(opt.b1, opt.b2))
 
 lr_scheduler_G = torch.optim.lr_scheduler.LambdaLR(
     optimizer_G, lr_lambda=LambdaLR(opt.n_epochs, opt.epoch,opt.start_up_epoch, opt.decay_epoch).step
 )
-
 
 if opt.epoch != 0:
     # Load pretrained models
@@ -73,10 +72,16 @@ else:
 
 dataloader =get_pic_dataloader("/"+opt.dataset_name,opt.batch_size,opt.n_cpu)
 temp_save=work_folder+"/psnr_temp"
+
+def tensorclamp(t):
+    r=torch.clamp(t,0,1)
+    return r
+
 def save_sample_images(path,label):
     G.eval()
     r_transform_n=transforms.Compose([
         #transforms.Normalize(mean = [ -1, -1, -1 ],std = [ 2, 2, 2 ]),
+        transforms.Lambda(tensorclamp),
         transforms.ToPILImage()
     ])
     for i, batch in enumerate(dataloader):
@@ -104,14 +109,14 @@ for epoch in range(opt.epoch, opt.n_epochs):
 
         fake=G(input)
         #loss calculation
-        #loss_hsv=Loss_hsv(fake,ground_truth)
-        loss_psnr=Loss_psnr(fake,ground_truth)
-        loss_G=loss_psnr
+        loss_lab=Loss_lab(fake,ground_truth)
+        #loss_psnr=Loss_psnr(fake,ground_truth)
+        loss_G=loss_lab #+loss_psnr
         loss_G.backward()
         optimizer_G.step()
         #cur_epoch_loss.append(loss_G.item())
-        history_loss.append(loss_psnr.item())
-        #history_HSV_loss.append(loss_hsv.item())
+        #history_loss.append(loss_psnr.item())
+        history_HSV_loss.append(loss_lab.item())
         # Determine approximate time left
         batches_done = epoch * len(dataloader) + i
         batches_left = opt.n_epochs * len(dataloader) - batches_done
@@ -120,25 +125,27 @@ for epoch in range(opt.epoch, opt.n_epochs):
 
         # Print log
         sys.stdout.write(
-            "\r[Epoch %d/%d] [Batch %d/%d] [G loss: %f HSV loss: -- PSNR loss: %f] ETA: %s"
+            "\r[Epoch %d/%d] [Batch %d/%d] [G loss: %f LAB loss: %f PSNR loss: --] ETA: %s"
             % (
                 epoch,
                 opt.n_epochs,
                 i,
                 len(dataloader),
                 loss_G.item(),
-                #loss_hsv.item(),
-                loss_psnr.item(),
+                loss_lab.item(),
+                #loss_psnr.item(),
                 time_left,
             )
         )
         if batches_done % int(opt.sample_interval/opt.batch_size) == 0:
+            pass
+            #sample_transform(temp_save,str(epoch))
             save_sample_images(temp_save,str(epoch)+'_'+str(i))
     # Update learning rates
     #history_loss.append(torch.mean(Tensor(cur_epoch_loss)))
     #los_avg = plt.subplot()
-    plt.plot(history_loss,color='red', label="PSNR loss")
-    #plt.plot(history_HSV_loss, color='green',label="HSV loss")
+    #plt.plot(history_loss,color='red', label="PSNR loss")
+    plt.plot(history_HSV_loss, color='green',label="LAB loss")
     plt.legend()
     plt.xlabel
     plt.xlabel("train iterations")

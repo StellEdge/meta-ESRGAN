@@ -7,7 +7,7 @@ import torchvision
 
 #from xinntao
 class VGGFeatureExtractor(nn.Module):
-    def __init__(self, feature_layer=34, use_bn=False, use_input_norm=True,
+    def __init__(self, feature_layer=34, use_bn=False, use_input_norm=False,
                  device=torch.device('cpu')):
         super(VGGFeatureExtractor, self).__init__()
         self.use_input_norm = use_input_norm
@@ -43,7 +43,7 @@ class discriminator_VGG(nn.Module):
         #first conv
         self.in_conv=[nn.Conv2d(channel_in,channel_gain,3,1,1,bias=True),
                       nn.LeakyReLU(0.2,True),
-                      nn.Conv2d(channel_gain,channel_gain,4,2,1,bias=False),
+                      nn.Conv2d(channel_gain,channel_gain,3,2,1,bias=False),
                       nn.BatchNorm2d(channel_gain,affine=True),
                       nn.LeakyReLU(0.2,True),
                       ]
@@ -56,15 +56,22 @@ class discriminator_VGG(nn.Module):
             cur_dim*=2
             cur_size/=2
         self.conv_layers=nn.Sequential(*self.conv_layers)
+        
         self.out_conv=[
             nn.Conv2d(cur_dim,cur_dim,3,1,1,bias=False),
             nn.BatchNorm2d(cur_dim,affine=True),
             nn.LeakyReLU(0.2,True),
-            nn.Conv2d(cur_dim,cur_dim,4,2,1,bias=False),
+            nn.Conv2d(cur_dim,cur_dim,3,2,1,bias=False),
             nn.BatchNorm2d(cur_dim,affine=True),
             nn.LeakyReLU(0.2,True),
             ]
+        '''
+        self.out_conv=[
+            nn.Conv2d(cur_dim,1,3,1,1,bias=True),
+            ]
+        '''
         self.out_conv=nn.Sequential(*self.out_conv)
+        
         cur_size/=2
         cur_size=int(cur_size)
         self.linear =[nn.Linear(cur_dim * cur_size * cur_size, 100),
@@ -72,12 +79,13 @@ class discriminator_VGG(nn.Module):
                       nn.Linear(100, 1)
                       ]
         self.linear=nn.Sequential(*self.linear)
+        
     def build_conv_block(self,channel_gain):
         model=[
-            nn.Conv2d(channel_gain,channel_gain*2,3,1,1,bias=False),
+            nn.Conv2d(channel_gain,channel_gain*2,3,1,1,bias=True),
             nn.BatchNorm2d(channel_gain*2,affine=True),
             nn.LeakyReLU(0.2,True),
-            nn.Conv2d(channel_gain*2,channel_gain*2,4,2,1,bias=False),
+            nn.Conv2d(channel_gain*2,channel_gain*2,4,2,1,bias=True),
             nn.BatchNorm2d(channel_gain*2,affine=True),
             nn.LeakyReLU(0.2,True),
             ]

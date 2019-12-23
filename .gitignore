@@ -344,3 +344,5 @@ healthchecksdb
 /model
 /temp
 /meta-ESRGAN/saved_models
+/GOOD results
+/GOOD results.zip

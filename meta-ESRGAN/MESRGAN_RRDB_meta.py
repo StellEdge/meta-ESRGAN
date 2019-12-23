@@ -28,6 +28,42 @@ while not None do:
 product.
 
 '''
+
+class MetaLearner(nn.Module):
+    """
+    The class defines meta-learner for Meta-SGD algorithm.
+    """
+    def __init__(self, params):
+        super(MetaLearner, self).__init__()
+        self.params = params
+        self.meta_learner = RRDBNet_meta(
+            params.channels,3, 64, params.n_residual_blocks, gc=32,bias=True)
+        #G=RRDBNet(3, 3, 64, opt.n_residual_blocks, gc=32) #origin 23 blocks
+        self.task_lr = OrderedDict()
+
+    def forward(self, X, adapted_params=None):
+        if adapted_params == None:
+            out = self.meta_learner(X) 
+        else:
+            out = self.meta_learner(X, adapted_params)
+        return out
+
+    def cloned_state_dict(self):
+        """
+        Only returns state_dict of meta_learner (not task_lr)
+        """
+        cloned_state_dict = {
+            key: val.clone()
+            for key, val in self.state_dict().items()
+        }
+        return cloned_state_dict
+
+    def define_task_lr_params(self):
+        for key, val in self.named_parameters():
+            # self.task_lr[key] = 1e-3 * torch.ones_like(val, requires_grad=True)
+            self.task_lr[key] = nn.Parameter(
+                1e-3 * torch.ones_like(val, requires_grad=True))
+
 BIAS=True
 
 class ResidualDenseBlock_meta(nn.Module):
