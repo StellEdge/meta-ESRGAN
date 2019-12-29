@@ -14,9 +14,9 @@ import matplotlib.pyplot as plt
 
 train_phase_name='GAN'
 parser = argparse.ArgumentParser()
-parser.add_argument("--epoch", type=int, default=15, help="epoch to start training from")
+parser.add_argument("--epoch", type=int, default=0, help="epoch to start training from")
 parser.add_argument("--n_epochs", type=int, default=201, help="number of epochs of training")
-parser.add_argument("--n_PSNR_epochs", type=int, default=60, help="number of PSNR epochs of training")
+parser.add_argument("--n_PSNR_epochs", type=int, default=70, help="number of PSNR epochs of training")
 parser.add_argument("--dataset_name", type=str, default="div2k", help="name of the dataset")
 parser.add_argument("--batch_size", type=int, default=2, help="size of the batches")
 parser.add_argument("--lr", type=float, default=0.0001, help="adam: learning rate")
@@ -46,7 +46,7 @@ Tensor = torch.cuda.FloatTensor if cuda else torch.Tensor
 Loss_per=nn.L1Loss()
 Loss_LAB=LABLoss()
 Loss_adv=nn.BCEWithLogitsLoss()
-G=RRDBNet_shuffle(3, 3, 64, opt.n_RRDB_blocks, gc=32)
+G=RRDBNet_shuffle(3, 3, 64, opt.n_RRDB_blocks, gc=24)
 D=discriminator_VGG(channel_in=3,channel_gain=48,input_size=512)
 
 train_dataset=get_pic_dataset("/"+opt.dataset_name)

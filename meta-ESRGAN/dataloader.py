@@ -23,7 +23,7 @@ transform_n=transforms.Compose([
 ])
 
 transform=transforms.Compose([
-    transforms.Lambda(addGaussian),
+    #transforms.Lambda(addGaussian),
     transforms.ToTensor(),
 ])
 

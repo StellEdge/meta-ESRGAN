@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import functools
 import skimage.color
-
+import math
 '''
 blocks for RRDB ESRGAN basic
 '''
@@ -17,6 +17,36 @@ class ChannelAttention(nn.Module):
         #for each channel,generate a meaningful alpha,
         #self attention mechanism with reduction synthesis
         self.input_size=128
+        self.fea_extract = nn.Sequential(
+                nn.Conv2d(channel, channel//reduction, 3,2, padding=2, bias=True),
+                nn.LeakyReLU(negative_slope=0.2, inplace=True), #64
+                nn.Conv2d( channel//reduction,  channel//reduction, 3,2, padding=2, bias=True),
+                nn.LeakyReLU(negative_slope=0.2, inplace=True), #32
+                nn.Conv2d( channel//reduction, channel, 3,2, padding=2, bias=True),
+                #nn.LeakyReLU(negative_slope=0.2, inplace=True), #16
+                nn.AdaptiveAvgPool2d(1),
+                nn.Sigmoid()
+        )
+
+    def forward(self, x):
+        y = self.fea_extract(x)
+        return x * y
+
+class ChannelAttention_MLP(nn.Module):
+    '''
+    each channel's feature means different in rebuilding HR image
+    so by learning what features are being extracted,which feature matters most can be applied.
+    '''
+    def __init__(self, channel, reduction=16):
+        super(ChannelAttention_MLP, self).__init__()
+        #for each channel,generate a meaningful alpha,
+        #self attention mechanism with reduction synthesis
+        self.input_size=128
+        self.avg_pool = nn.Sequential(
+                nn.AdaptiveAvgPool2d(1),
+        )
+        self.max_pool = nn.Sequential(
+                nn.MaxPool2d()        )
         self.fea_extract = nn.Sequential(
                 nn.Conv2d(channel, channel//reduction, 3,2, padding=2, bias=True),
                 nn.LeakyReLU(negative_slope=0.2, inplace=True), #64
@@ -71,8 +101,9 @@ class RRDB(nn.Module):
         out=x
         for i in range(self.block_num):
             out=self.blocks[i](out)
+        out=self.attention_layer(out)
         res=out * self.res_alpha + x
-        res=self.attention_layer(res)
+        #res=self.attention_layer(res)
         return res
 
 def make_layer(block, n_layers):
@@ -132,27 +163,59 @@ class RRDBNet_shuffle(nn.Module):
         self.trunk_conv = nn.Conv2d(channel_flow, channel_flow, 3, 1, 1, bias=bias)
         #### upsampling
      
+        '''
         self.channelconv1 = nn.Conv2d(channel_flow, channel_flow*4, 3, 1, 1, bias=bias)
         self.pixle_suffle1=nn.PixelShuffle(2)
         self.channelconv2 = nn.Conv2d(channel_flow, channel_flow*4, 3, 1, 1, bias=bias)
         self.pixle_suffle2=nn.PixelShuffle(2)
-        
-        #self.conv_deboard = nn.Conv2d(channel_flow, channel_flow, 5, 1, 2, bias=bias)
+        '''
+        self.channelconv1 = nn.Conv2d(channel_flow, channel_flow*4, 3, 1, 1, bias=bias)
+        self.pixle_suffle1=nn.PixelShuffle(2)
+        self.channelconv2 = nn.Conv2d(channel_flow, channel_flow*4, 3, 1, 1, bias=bias)
+        self.pixle_suffle2=nn.PixelShuffle(2)
+        #self.conv_deboard = nn.Conv2d(channel_flow, 3*4*4, 3, 1, 1, bias=bias)
         self.conv_last = nn.Conv2d(channel_flow, channel_out, 3, 1, 1, bias=bias)
 
         self.lrelu = nn.LeakyReLU(negative_slope=0.2, inplace=True)
-        
 
+        #self.chanel_flow=channel_flow
+        random_weight_seed=torch.empty( channel_flow,channel_flow,3,3).normal_(mean=0,std= math.sqrt( 2/((1+0.2**2)*10*channel_flow) ) ).cuda()
+        weight=torch.empty( channel_flow*4,channel_flow,3,3).cuda()
+        for i in range(4):
+            for k in range(channel_flow):
+                weight[k*4+i,:,:,:]=random_weight_seed[k,:,:,:]
+        self.weight_1= weight
+
+        random_weight_seed=torch.empty( channel_flow,channel_flow,3,3).normal_(mean=0,std= math.sqrt( 2/((1+0.2**2)*10*channel_flow) )).cuda()
+        weight=torch.empty( channel_flow*4,channel_flow,3,3).cuda()
+        for i in range(4):
+            for k in range(channel_flow):
+                weight[k*4+i,:,:,:]=random_weight_seed[k,:,:,:]
+        self.weight_2= weight
+
+    def init_sub_pixel_weight(self):
+        self.channelconv1.weight=nn.Parameter(self.weight_1, requires_grad=True).cuda()
+        self.channelconv2.weight=nn.Parameter(self.weight_2, requires_grad=True).cuda()
+        #self.conv_deboard.weight.data=self.weight
     def forward(self, x):
         fea = self.conv_first(x)
         trunk = self.trunk_conv(self.RRDB_trunk(fea))
         fea = fea + trunk
 
         #out=self.upsample(fea)
-        
+        '''
+        output_recombine=[]
+        for i in range(3*4*4):
+            output_recombine.append(self.conv_deboard(fea))
+        fea = torch.cat(output_recombine, 1)
+        '''
+        #fea = self.conv_deboard(fea)    #F.conv2d(fea,self.weight, None,stride=1,padding=1)
+        #fea = self.pixle_suffle1(self.lrelu(fea))
         fea = self.pixle_suffle1(self.lrelu(self.channelconv1(fea)))
         fea = self.pixle_suffle2(self.lrelu(self.channelconv2(fea)))
+
         out = self.conv_last(fea)
+
         return out
 
 class RRDBNet_shuffle_flatten(nn.Module):
@@ -263,8 +326,23 @@ class LABLoss(nn.Module):
         super(LABLoss,self).__init__()
     def forward(self,data1,data2):        
         rmean = ((data1[:,0] +data2[:,0] ) / 2)*255
-        R = (data1[:,0] -data2[:,0])*255
-        G = (data1[:,1] -data2[:,1])*255
-        B = (data1[:,2] -data2[:,2])*255
-        result = torch.mean((2+rmean/256)*(R**2)+4*(G**2)+(2+(255-rmean)/256)*(B**2))/(255**2)
+        R = (data1[:,0] -data2[:,0])
+        G = (data1[:,1] -data2[:,1])
+        B = (data1[:,2] -data2[:,2])
+        result = torch.mean((2+rmean/256)*(R**2)+4*(G**2)+(2+(255-rmean)/256)*(B**2))
+        return result
+
+class LABLoss_L1(nn.Module):
+    def __init__(self):
+        super(LABLoss,self).__init__()
+    def forward(self,data1,data2):        
+        rmean = ((data1[:,0] +data2[:,0] ) / 2)*255
+        #R = (data1[:,0] -data2[:,0])
+        #G = (data1[:,1] -data2[:,1])
+        #B = (data1[:,2] -data2[:,2])
+        #result = torch.mean((2+rmean/256)*(R**2)+4*(G**2)+(2+(255-rmean)/256)*(B**2))/(255**2)
+        R = F.l1_loss(data1[:,0],data2[:,0])
+        G = F.l1_loss(data1[:,1],data2[:,1])
+        B = F.l1_loss(data1[:,2],data2[:,2])
+        result = torch.mean((2+rmean/256)*(R)+4*(G)+(2+(255-rmean)/256)*(B))
         return result

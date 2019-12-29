@@ -22,19 +22,18 @@ parser.add_argument("--img_width", type=int, default=256, help="size of image wi
 parser.add_argument("--channels", type=int, default=3, help="number of image channels")
 parser.add_argument("--sample_interval", type=int, default=200, help="interval between saving generator outputs")
 parser.add_argument("--checkpoint_interval", type=int, default=10, help="interval between saving model checkpoints")
-parser.add_argument("--saved_PSNR_model_path",type=str,default="saved_models/div2k/G_HSV_60.pth",help="path of saved PSNR model")#输入PSNR模型路径
-parser.add_argument("--n_residual_blocks", type=int, default=6, help="number of residual blocks in PSNR generator")
-parser.add_argument("--saved_ESRGAN_model_path",type=str,default="saved_models/div2k/G_GAN_155.pth",help="path of saved ESRGAN model")#输入ESRGAN模型路径
-parser.add_argument("--n_RRDB_blocks", type=int, default=23, help="number of residual blocks in ESRGAN generator")
+parser.add_argument("--saved_PSNR_model_path",type=str,default="saved_models/div2k/without_meta_3B/G_HSV_60.pth",help="path of saved PSNR model")#输入PSNR模型路径
+parser.add_argument("--n_residual_blocks", type=int, default=3, help="number of residual blocks in PSNR generator")
+parser.add_argument("--saved_ESRGAN_model_path",type=str,default="saved_models/div2k/without_meta_3B/G_HSV_60.pth",help="path of saved ESRGAN model")#输入ESRGAN模型路径
 
 opt = parser.parse_args()
 
 cuda=torch.cuda.is_available()
 
-G_PSNR=RRDBNet_shuffle(3, 3, 64, opt.n_residual_blocks, gc=32)
-G_PSNR_meta=RRDBNet_shuffle(3, 3, 64, opt.n_residual_blocks, gc=32)
+G_PSNR=RRDBNet(3, 3, 64, opt.n_residual_blocks, gc=24)
+G_PSNR_meta=RRDBNet(3, 3, 64, opt.n_residual_blocks, gc=24)
 
-G_GAN=RRDBNet_shuffle(3, 3, 64, opt.n_residual_blocks, gc=32)
+G_GAN=RRDBNet(3, 3, 64, opt.n_residual_blocks, gc=24)
 if cuda:
     print("Using CUDA.")
     G_PSNR=G_PSNR.cuda()
@@ -59,7 +58,8 @@ for x, y in zip(list(G_GAN.named_parameters()), list(G_PSNR.named_parameters()))
         alpha+=0.2
 
 #dataloader =get_pic_dataloader("/"+opt.dataset_name,opt.batch_size,opt.n_cpu)
-dataset=get_pic_dataset("/"+opt.dataset_name+'_test')
+#dataset=get_pic_dataset("/"+opt.dataset_name+'_test')
+dataset=get_pic_dataset("/val")
 temp_save=work_folder+"/temp"
 
 def tensorclamp(t):
